@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Tutto Punktezähler</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #1a6b3c;
+  background-image: radial-gradient(ellipse at center, #228B22 0%, #0d4d2b 100%);
+  color: #fff;
+  min-height: 100vh;
+}
+
+h1 { text-align: center; font-size: 2rem; padding: 12px 0; text-shadow: 2px 2px 4px rgba(0,0,0,.5); }
+
+button {
+  cursor: pointer;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  padding: 10px 20px;
+  font-weight: 600;
+  transition: transform .1s, box-shadow .1s;
+}
+button:active { transform: scale(.96); }
+button:disabled { opacity: .45; cursor: default; transform: none; }
+
+.btn-primary { background: #c0392b; color: #fff; box-shadow: 0 3px 6px rgba(0,0,0,.3); }
+.btn-primary:hover:not(:disabled) { background: #e74c3c; }
+.btn-secondary { background: #2c3e50; color: #fff; }
+.btn-secondary:hover:not(:disabled) { background: #34495e; }
+.btn-success { background: #27ae60; color: #fff; box-shadow: 0 3px 6px rgba(0,0,0,.3); }
+.btn-success:hover:not(:disabled) { background: #2ecc71; }
+.btn-warning { background: #e67e22; color: #fff; }
+.btn-warning:hover:not(:disabled) { background: #f39c12; }
+.btn-danger { background: #8e44ad; color: #fff; }
+.btn-danger:hover:not(:disabled) { background: #9b59b6; }
+.btn-niete { background: #c0392b; color: #fff; }
+.btn-niete:hover:not(:disabled) { background: #e74c3c; }
+.btn-tutto { background: #f39c12; color: #fff; box-shadow: 0 3px 6px rgba(0,0,0,.3); }
+.btn-tutto:hover:not(:disabled) { background: #f1c40f; }
+
+.screen { display: none; }
+.screen.active { display: block; }
+
+/* -------- Setup Screen -------- */
+#setup-screen { max-width: 480px; margin: 0 auto; padding: 20px; }
+#setup-screen h1 { font-size: 2.4rem; margin-bottom: 4px; }
+.subtitle { text-align: center; opacity: .7; margin-bottom: 24px; }
+#player-inputs { display: flex; flex-direction: column; margin-bottom: 16px; }
+#player-inputs input { margin-bottom: 8px; }
+#player-inputs input {
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 2px solid rgba(255,255,255,.25);
+  background: rgba(255,255,255,.12);
+  color: #fff;
+  font-size: 1rem;
+}
+#player-inputs input::placeholder { color: rgba(255,255,255,.5); }
+#player-inputs input:focus { outline: none; border-color: #e74c3c; background: rgba(255,255,255,.2); }
+.setup-buttons { display: flex; justify-content: center; flex-wrap: wrap; }
+.setup-buttons button { margin: 4px 5px; }
+
+/* -------- Game Screen -------- */
+#game-screen { padding: 8px; max-width: 900px; margin: 0 auto; }
+
+/* Scoreboard */
+.scoreboard {
+  background: rgba(0,0,0,.35);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+  overflow-x: auto;
+}
+.scoreboard table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.scoreboard th, .scoreboard td { padding: 4px 8px; text-align: center; white-space: nowrap; }
+.scoreboard th { border-bottom: 2px solid rgba(255,255,255,.3); font-size: .8rem; text-transform: uppercase; letter-spacing: .5px; }
+.scoreboard .active-player { background: rgba(231,76,60,.35); border-radius: 6px; }
+
+/* Card display */
+.card-display {
+  background: #fffbe6;
+  color: #333;
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 10px;
+  text-align: center;
+  box-shadow: 0 4px 15px rgba(0,0,0,.4);
+  border: 3px solid #d4a017;
+}
+.card-display .card-name { font-size: 1.4rem; font-weight: 700; color: #8B0000; }
+.card-display .card-desc { font-size: .85rem; color: #555; margin-top: 4px; }
+
+/* Card picker grid */
+.card-picker {
+  display: -webkit-flex;
+  display: flex;
+  -webkit-flex-wrap: wrap;
+  flex-wrap: wrap;
+  -webkit-justify-content: center;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+.card-picker-btn {
+  background: #fffbe6;
+  color: #333;
+  border: 2px solid #d4a017;
+  border-radius: 10px;
+  padding: 10px 8px;
+  margin: 4px;
+  text-align: center;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  font-weight: 700;
+  font-size: .95rem;
+  -webkit-transition: transform .1s, box-shadow .15s;
+  transition: transform .1s, box-shadow .15s;
+  box-shadow: 0 2px 6px rgba(0,0,0,.25);
+  width: 120px;
+}
+.card-picker-btn:hover, .card-picker-btn:active {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0,0,0,.4);
+  border-color: #c0392b;
+}
+.card-picker-btn .cpb-name { color: #8B0000; }
+.card-picker-btn .cpb-desc { font-size: .7rem; font-weight: 400; color: #666; margin-top: 2px; }
+
+/* Turn info */
+.turn-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(0,0,0,.25);
+  border-radius: 8px;
+  padding: 8px 14px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.turn-info .player-name { font-size: 1.2rem; font-weight: 700; }
+.turn-info .round-points { font-size: 1.1rem; color: #f1c40f; }
+
+/* Points entry */
+.points-entry {
+  display: -webkit-flex;
+  display: flex;
+  -webkit-align-items: center;
+  align-items: center;
+  -webkit-justify-content: center;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+.points-entry .pe-btn {
+  width: 72px; height: 72px;
+  margin: 0 10px;
+  border-radius: 50%;
+  font-size: 2rem;
+  font-weight: 700;
+  display: -webkit-flex;
+  display: flex;
+  -webkit-align-items: center;
+  align-items: center;
+  -webkit-justify-content: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  color: #fff;
+  box-shadow: 0 3px 8px rgba(0,0,0,.3);
+  -webkit-transition: transform .1s;
+  transition: transform .1s;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.points-entry .pe-btn:active { transform: scale(.9); }
+.points-entry .pe-minus { background: #c0392b; }
+.points-entry .pe-minus:hover { background: #e74c3c; }
+.points-entry .pe-plus { background: #27ae60; }
+.points-entry .pe-plus:hover { background: #2ecc71; }
+.points-entry .pe-value {
+  font-size: 2.6rem;
+  font-weight: 700;
+  min-width: 120px;
+  text-align: center;
+  color: #f1c40f;
+  text-shadow: 1px 1px 3px rgba(0,0,0,.5);
+  margin: 0 6px;
+}
+.points-entry-label {
+  text-align: center;
+  font-size: .85rem;
+  opacity: .7;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* Quick point buttons */
+.quick-points {
+  display: -webkit-flex;
+  display: flex;
+  -webkit-flex-wrap: wrap;
+  flex-wrap: wrap;
+  -webkit-justify-content: center;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+.quick-points button {
+  background: rgba(255,255,255,.15);
+  color: #fff;
+  border: 2px solid rgba(255,255,255,.3);
+  border-radius: 8px;
+  padding: 10px 6px;
+  margin: 3px;
+  font-size: 1rem;
+  font-weight: 700;
+  min-width: 58px;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-transition: background .15s;
+  transition: background .15s;
+}
+.quick-points button:active {
+  background: rgba(255,255,255,.35);
+}
+
+/* Actions */
+.actions {
+  display: -webkit-flex;
+  display: flex;
+  -webkit-justify-content: center;
+  justify-content: center;
+  -webkit-flex-wrap: wrap;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.actions button { min-width: 140px; margin: 4px; }
+
+/* Messages */
+.message-box {
+  background: rgba(0,0,0,.5);
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 10px;
+  text-align: center;
+  font-size: 1.05rem;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.message-box.niete { background: rgba(192,57,43,.6); }
+.message-box.tutto { background: rgba(39,174,96,.6); }
+.message-box.special { background: rgba(142,68,173,.6); }
+
+/* Overlay / modal */
+.overlay {
+  display: none;
+  position: fixed;
+  top: 0; right: 0; bottom: 0; left: 0;
+  background: rgba(0,0,0,.7);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+}
+.overlay.active { display: flex; }
+.modal {
+  background: linear-gradient(135deg, #1a6b3c, #0d4d2b);
+  border: 3px solid #d4a017;
+  border-radius: 16px;
+  padding: 30px;
+  text-align: center;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0,0,0,.5);
+}
+.modal h2 { font-size: 2rem; color: #f1c40f; margin-bottom: 10px; }
+.modal p { margin-bottom: 16px; font-size: 1.1rem; }
+
+/* Responsive */
+@media (max-width: 480px) {
+  h1 { font-size: 1.6rem; }
+  .points-entry .pe-btn { width: 64px; height: 64px; font-size: 1.8rem; }
+  .points-entry .pe-value { font-size: 2.2rem; min-width: 90px; }
+  .actions button { min-width: 110px; font-size: .9rem; padding: 8px 14px; }
+  .card-display .card-name { font-size: 1.15rem; }
+  .quick-points button { min-width: 50px; font-size: .9rem; padding: 8px 4px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ============ SETUP SCREEN ============ -->
+<div id="setup-screen" class="screen active">
+  <h1>Tutto</h1>
+  <p class="subtitle">Punktezähler</p>
+  <div id="player-inputs"></div>
+  <div class="setup-buttons">
+    <button class="btn-secondary" onclick="addPlayerInput()">+ Spieler</button>
+    <button class="btn-secondary" onclick="removePlayerInput()">- Spieler</button>
+    <button class="btn-primary" onclick="startGame()" style="min-width:160px">Spiel starten</button>
+  </div>
+</div>
+
+<!-- ============ GAME SCREEN ============ -->
+<div id="game-screen" class="screen">
+  <div class="scoreboard" id="scoreboard"></div>
+  <div class="card-display" id="card-display"></div>
+  <div class="turn-info" id="turn-info"></div>
+  <div class="message-box" id="message-box"></div>
+  <div id="points-section" style="display:none"></div>
+  <div class="actions" id="actions"></div>
+</div>
+
+<!-- ============ WIN OVERLAY ============ -->
+<div class="overlay" id="win-overlay">
+  <div class="modal">
+    <h2 id="win-title"></h2>
+    <p id="win-message"></p>
+    <button class="btn-primary" onclick="resetGame()">Neues Spiel</button>
+  </div>
+</div>
+
+<script>
+// =====================================================================
+//  TUTTO SCORER – Simplified: Card pick + manual point entry
+// =====================================================================
+
+// ─── Card Definitions ────────────────────────────────────────────────
+const CARD_TYPES = {
+  BONUS_200:  { name: 'Bonus 200',   bonus: 200,  desc: 'Bei Tutto: +200 Bonuspunkte' },
+  BONUS_300:  { name: 'Bonus 300',   bonus: 300,  desc: 'Bei Tutto: +300 Bonuspunkte' },
+  BONUS_400:  { name: 'Bonus 400',   bonus: 400,  desc: 'Bei Tutto: +400 Bonuspunkte' },
+  BONUS_500:  { name: 'Bonus 500',   bonus: 500,  desc: 'Bei Tutto: +500 Bonuspunkte' },
+  BONUS_600:  { name: 'Bonus 600',   bonus: 600,  desc: 'Bei Tutto: +600 Bonuspunkte' },
+  X2:         { name: 'x2',          desc: 'Bei Tutto: Rundenpunkte verdoppelt!' },
+  STOP:       { name: 'Stop!',       desc: 'Du setzt diese Runde aus.' },
+  FEUERWERK:  { name: 'Feuerwerk',   desc: 'Würfeln bis Niete – alle Punkte behalten!' },
+  PLUSMINUS:  { name: 'Plus/Minus',  desc: 'Tutto = +1000 & Führender -1000. Niete = 0.' },
+  STRASSE:    { name: 'Straße',      desc: 'Lege 1-2-3-4-5-6 ab. Erfolg = 2000 Punkte!' },
+  KLEEBLATT:  { name: 'Kleeblatt',   desc: '2x Tutto hintereinander = Sofortsieg!' },
+};
+
+const CARD_KEYS = [
+  'BONUS_200','BONUS_300','BONUS_400','BONUS_500','BONUS_600',
+  'X2','STOP','FEUERWERK','PLUSMINUS','STRASSE','KLEEBLATT',
+];
+
+// ─── Game State ──────────────────────────────────────────────────────
+let game = null;
+
+function initGame(playerNames) {
+  game = {
+    players: playerNames.map(name => ({ name, score: 0 })),
+    currentPlayerIndex: 0,
+    turn: null,
+    // Phases: PICK_CARD, ENTER_POINTS, TURN_END
+    phase: 'PICK_CARD',
+    gameOver: false,
+    finalRound: false,
+    finalRoundStartPlayer: -1,
+    winner: null,
+  };
+}
+
+function currentPlayer() { return game.players[game.currentPlayerIndex]; }
+
+// ─── Turn Logic ──────────────────────────────────────────────────────
+function startTurn(cardType) {
+  const card = CARD_TYPES[cardType];
+  const carried = game.carryPoints || 0;
+  game.carryPoints = 0;
+
+  game.turn = {
+    cardType,
+    card,
+    roundPoints: carried,
+    entryPoints: 0,      // current +/- entry
+    tuttoCount: 0,       // for Kleeblatt
+  };
+
+  // Stop card: lose all carried points
+  if (cardType === 'STOP') {
+    game.phase = 'TURN_END';
+    if (carried > 0) {
+      showMessage(`Stop! ${carried} Rundenpunkte verfallen.`, 'niete');
+    } else {
+      showMessage('Stop! Du setzt aus.', 'niete');
+    }
+    renderGame();
+    return;
+  }
+
+  // Straße: no point entry, just success/fail
+  if (cardType === 'STRASSE') {
+    game.phase = 'ENTER_POINTS';
+    showMessage('Straße! Versuche 1-2-3-4-5-6 abzulegen.');
+    renderGame();
+    return;
+  }
+
+  // Plus/Minus: no point entry, just tutto/niete
+  if (cardType === 'PLUSMINUS') {
+    game.phase = 'ENTER_POINTS';
+    showMessage('Plus/Minus! Du musst ein Tutto schaffen.');
+    renderGame();
+    return;
+  }
+
+  // Kleeblatt: no point entry, just tutto/niete
+  if (cardType === 'KLEEBLATT') {
+    game.phase = 'ENTER_POINTS';
+    showMessage('Kleeblatt! Schaffe 2 Tuttos hintereinander!');
+    renderGame();
+    return;
+  }
+
+  game.phase = 'ENTER_POINTS';
+  showMessage(getCardInstruction(cardType));
+  renderGame();
+}
+
+function getCardInstruction(cardType) {
+  switch (cardType) {
+    case 'FEUERWERK': return 'Feuerwerk! Würfle bis zur Niete – du behältst alle Punkte!';
+    default: return 'Gib deine Punkte ein.';
+  }
+}
+
+// ─── Point Entry ─────────────────────────────────────────────────────
+function setPoints(value) {
+  const t = game.turn;
+  t.entryPoints = value;
+  renderPointsSection();
+  renderActions();
+}
+
+function adjustPoints(amount) {
+  const t = game.turn;
+  t.entryPoints = Math.max(0, t.entryPoints + amount);
+  renderPointsSection();
+  renderActions();
+}
+
+function addPoints() {
+  // "Weiter würfeln": add entry to round total, reset entry
+  const t = game.turn;
+  if (t.entryPoints <= 0) return;
+  t.roundPoints += t.entryPoints;
+  showMessage(`+${t.entryPoints} hinzugefügt. Rundenpunkte: ${t.roundPoints}`);
+  t.entryPoints = 0;
+  renderGame();
+}
+
+function stopAndScore() {
+  const t = game.turn;
+  // Add any pending entry points
+  t.roundPoints += t.entryPoints;
+  t.entryPoints = 0;
+
+  const pts = t.roundPoints;
+  currentPlayer().score += pts;
+  game.phase = 'TURN_END';
+  showMessage(`+${pts} Punkte! Gesamt: ${currentPlayer().score}`, 'special');
+  checkGameEnd();
+  renderGame();
+}
+
+function tuttoChoiceTakePoints() {
+  const t = game.turn;
+  const pts = t.roundPoints;
+  currentPlayer().score += pts;
+  game.phase = 'TURN_END';
+  showMessage(`+${pts} Punkte! Gesamt: ${currentPlayer().score}`, 'special');
+  checkGameEnd();
+  renderGame();
+}
+
+function tuttoChoiceContinue() {
+  const t = game.turn;
+  continueTurnWithNewCard(t.roundPoints);
+}
+
+function handleNiete() {
+  const t = game.turn;
+
+  if (t.cardType === 'FEUERWERK') {
+    // Feuerwerk: keep all round points despite niete
+    // Add any pending entry first
+    t.roundPoints += t.entryPoints;
+    t.entryPoints = 0;
+    const pts = t.roundPoints;
+    currentPlayer().score += pts;
+    game.phase = 'TURN_END';
+    showMessage(`Feuerwerk-Niete! Du behältst ${pts} Punkte.`, 'special');
+    checkGameEnd();
+    renderGame();
+    return;
+  }
+
+  if (t.cardType === 'PLUSMINUS' || t.cardType === 'KLEEBLATT' || t.cardType === 'STRASSE') {
+    game.phase = 'TURN_END';
+    showMessage('Niete! 0 Punkte für diese Runde.', 'niete');
+    renderGame();
+    return;
+  }
+
+  // Normal niete: lose all round points
+  game.phase = 'TURN_END';
+  showMessage('Niete! Alle Rundenpunkte verloren.', 'niete');
+  renderGame();
+}
+
+function handleTutto() {
+  const t = game.turn;
+
+  // For normal cards, first add any pending entry points
+  if (!['PLUSMINUS','STRASSE','KLEEBLATT'].includes(t.cardType)) {
+    t.roundPoints += t.entryPoints;
+    t.entryPoints = 0;
+  }
+
+  t.tuttoCount++;
+
+  // ── Kleeblatt ──
+  if (t.cardType === 'KLEEBLATT') {
+    if (t.tuttoCount >= 2) {
+      game.winner = game.currentPlayerIndex;
+      game.gameOver = true;
+      showWinScreen(currentPlayer().name, 'Kleeblatt! Sofortsieg!');
+      return;
+    }
+    showMessage('Erstes Tutto! Noch ein Tutto nötig!', 'tutto');
+    renderGame();
+    return;
+  }
+
+  // ── Plus/Minus ──
+  if (t.cardType === 'PLUSMINUS') {
+    t.roundPoints += 1000;
+    const leader = getLeader(game.currentPlayerIndex);
+    if (leader !== null) {
+      game.players[leader].score = Math.max(0, game.players[leader].score - 1000);
+    }
+    game.phase = 'TUTTO_CHOICE';
+    showMessage(`Tutto! +1000 (Rundenpunkte: ${t.roundPoints}), Führender -1000!`, 'tutto');
+    renderGame();
+    return;
+  }
+
+  // ── Straße ──
+  if (t.cardType === 'STRASSE') {
+    t.roundPoints += 2000;
+    game.phase = 'TUTTO_CHOICE';
+    showMessage(`Straße komplett! +2000 (Rundenpunkte: ${t.roundPoints})`, 'tutto');
+    renderGame();
+    return;
+  }
+
+  // ── Bonus cards ──
+  if (t.cardType.startsWith('BONUS_')) {
+    const bonus = t.card.bonus;
+    t.roundPoints += bonus;
+    game.phase = 'TUTTO_CHOICE';
+    showMessage(`Tutto! +${bonus} Bonus! Rundenpunkte: ${t.roundPoints}`, 'tutto');
+    renderGame();
+    return;
+  }
+
+  // ── x2 ──
+  if (t.cardType === 'X2') {
+    t.roundPoints *= 2;
+    game.phase = 'TUTTO_CHOICE';
+    showMessage(`Tutto! Verdoppelt! Rundenpunkte: ${t.roundPoints}`, 'tutto');
+    renderGame();
+    return;
+  }
+
+  // ── Feuerwerk ──
+  if (t.cardType === 'FEUERWERK') {
+    // Tutto at Feuerwerk: keep rolling with same card, no new card
+    showMessage('Tutto beim Feuerwerk! Weiter würfeln!', 'tutto');
+    renderGame();
+    return;
+  }
+}
+
+function continueTurnWithNewCard(carryPoints) {
+  // After a Tutto: points are NOT banked yet, player picks a new card
+  game.carryPoints = carryPoints || 0;
+  game.turn = null;
+  game.phase = 'PICK_CARD';
+  renderGame();
+}
+
+// ─── Navigation ──────────────────────────────────────────────────────
+function nextPlayer() {
+  game.currentPlayerIndex = (game.currentPlayerIndex + 1) % game.players.length;
+  if (game.finalRound && game.currentPlayerIndex === game.finalRoundStartPlayer) {
+    endGame();
+    return;
+  }
+  game.phase = 'PICK_CARD';
+  game.turn = null;
+  game.carryPoints = 0;
+  showMessage('Wähle die gezogene Karte aus!');
+  renderGame();
+}
+
+function getLeader(excludeIndex) {
+  let maxScore = -1;
+  let leaderIdx = null;
+  game.players.forEach((p, i) => {
+    if (i !== excludeIndex && p.score > maxScore) {
+      maxScore = p.score;
+      leaderIdx = i;
+    }
+  });
+  return maxScore > 0 ? leaderIdx : null;
+}
+
+function checkGameEnd() {
+  if (game.gameOver) return;
+  if (currentPlayer().score >= 6000 && !game.finalRound) {
+    game.finalRound = true;
+    game.finalRoundStartPlayer = game.currentPlayerIndex;
+  }
+}
+
+function endGame() {
+  let maxScore = -1;
+  let winnerIdx = 0;
+  game.players.forEach((p, i) => {
+    if (p.score > maxScore) {
+      maxScore = p.score;
+      winnerIdx = i;
+    }
+  });
+  game.winner = winnerIdx;
+  game.gameOver = true;
+  showWinScreen(game.players[winnerIdx].name, `Gewinner mit ${maxScore} Punkten!`);
+}
+
+function showWinScreen(name, msg) {
+  document.getElementById('win-title').textContent = `${name} gewinnt!`;
+  document.getElementById('win-message').textContent = msg;
+  document.getElementById('win-overlay').classList.add('active');
+}
+
+// ─── Message ─────────────────────────────────────────────────────────
+function showMessage(text, cls) {
+  const el = document.getElementById('message-box');
+  if (el) {
+    el.textContent = text;
+    el.className = 'message-box' + (cls ? ' ' + cls : '');
+  }
+}
+
+// ─── UI Rendering ────────────────────────────────────────────────────
+function renderGame() {
+  renderScoreboard();
+  renderCard();
+  renderTurnInfo();
+  renderPointsSection();
+  renderActions();
+}
+
+function renderScoreboard() {
+  const el = document.getElementById('scoreboard');
+  let html = '<table><tr>';
+  game.players.forEach((p, i) => {
+    const cls = i === game.currentPlayerIndex ? ' class="active-player"' : '';
+    html += `<th${cls}>${escHtml(p.name)}</th>`;
+  });
+  html += '</tr><tr>';
+  game.players.forEach((p, i) => {
+    const cls = i === game.currentPlayerIndex ? ' class="active-player"' : '';
+    html += `<td${cls}><strong>${p.score}</strong></td>`;
+  });
+  html += '</tr></table>';
+  el.innerHTML = html;
+}
+
+function renderCard() {
+  const el = document.getElementById('card-display');
+  if (game.phase === 'PICK_CARD') {
+    let html = '<div class="card-name" style="margin-bottom:10px">Welche Karte wurde gezogen?</div>';
+    html += '<div class="card-picker">';
+    CARD_KEYS.forEach(key => {
+      const c = CARD_TYPES[key];
+      html += `<button type="button" class="card-picker-btn" onclick="startTurn('${key}')">` +
+        `<span class="cpb-name">${escHtml(c.name)}</span>` +
+        `<span class="cpb-desc" style="display:block">${escHtml(c.desc)}</span></button>`;
+    });
+    html += '</div>';
+    el.innerHTML = html;
+    return;
+  }
+  if (!game.turn) {
+    el.innerHTML = '';
+    return;
+  }
+  const c = game.turn.card;
+  el.innerHTML = `<div class="card-name">${escHtml(c.name)}</div><div class="card-desc">${escHtml(c.desc)}</div>`;
+}
+
+function renderTurnInfo() {
+  const el = document.getElementById('turn-info');
+  const p = currentPlayer();
+  const rp = game.turn ? game.turn.roundPoints : (game.carryPoints || 0);
+  const finalInfo = game.finalRound ? ' (Letzte Runde!)' : '';
+  el.innerHTML = `<span class="player-name">${escHtml(p.name)} ist dran${finalInfo}</span>` +
+    `<span class="round-points">Rundenpunkte: ${rp}</span>`;
+}
+
+function renderPointsSection() {
+  const el = document.getElementById('points-section');
+
+  // Only show during ENTER_POINTS for cards that need point input
+  if (game.phase !== 'ENTER_POINTS' || !game.turn) {
+    el.style.display = 'none';
+    return;
+  }
+
+  const t = game.turn;
+
+  // Cards with no point entry (only tutto/niete buttons)
+  if (['PLUSMINUS','STRASSE','KLEEBLATT'].includes(t.cardType)) {
+    el.style.display = 'none';
+    return;
+  }
+
+  el.style.display = '';
+  el.innerHTML =
+    '<div class="quick-points">' +
+      '<button type="button" onclick="setPoints(100)">100</button>' +
+      '<button type="button" onclick="setPoints(200)">200</button>' +
+      '<button type="button" onclick="setPoints(300)">300</button>' +
+      '<button type="button" onclick="setPoints(400)">400</button>' +
+      '<button type="button" onclick="setPoints(500)">500</button>' +
+      '<button type="button" onclick="setPoints(600)">600</button>' +
+      '<button type="button" onclick="setPoints(1000)">1000</button>' +
+    '</div>' +
+    '<div class="points-entry-label">Feineinstellung</div>' +
+    '<div class="points-entry">' +
+      '<button type="button" class="pe-btn pe-minus" onclick="adjustPoints(-50)">-</button>' +
+      `<div class="pe-value">${t.entryPoints}</div>` +
+      '<button type="button" class="pe-btn pe-plus" onclick="adjustPoints(50)">+</button>' +
+    '</div>';
+}
+
+function renderActions() {
+  const el = document.getElementById('actions');
+
+  if (game.phase === 'PICK_CARD') {
+    el.innerHTML = '';
+    return;
+  }
+
+  if (!game.turn) {
+    el.innerHTML = '';
+    return;
+  }
+
+  const t = game.turn;
+  let html = '';
+
+  if (game.phase === 'ENTER_POINTS') {
+    const cardType = t.cardType;
+
+    // ── Cards with only Tutto/Niete (no point entry) ──
+    if (cardType === 'PLUSMINUS' || cardType === 'KLEEBLATT') {
+      html += `<button class="btn-tutto" onclick="handleTutto()">Tutto!</button>`;
+      html += `<button class="btn-niete" onclick="handleNiete()">Niete</button>`;
+
+    } else if (cardType === 'STRASSE') {
+      html += `<button class="btn-tutto" onclick="handleTutto()">Straße geschafft!</button>`;
+      html += `<button class="btn-niete" onclick="handleNiete()">Niete</button>`;
+
+    } else if (cardType === 'FEUERWERK') {
+      // Feuerwerk: can add points, tutto, or niete (no stop allowed)
+      const fTotal = t.roundPoints + t.entryPoints;
+      html += `<button class="btn-success" onclick="addPoints()" ${t.entryPoints<=0?'disabled':''}>Weiter würfeln</button>`;
+      html += `<button class="btn-tutto" onclick="handleTutto()" ${fTotal<300?'disabled':''}>Tutto!</button>`;
+      html += `<button class="btn-niete" onclick="handleNiete()">Niete</button>`;
+
+    } else {
+      // Normal / Bonus / x2: can add, stop, tutto, niete
+      const nTotal = t.roundPoints + t.entryPoints;
+      html += `<button class="btn-success" onclick="addPoints()" ${t.entryPoints<=0?'disabled':''}>Weiter würfeln</button>`;
+      html += `<button class="btn-warning" onclick="stopAndScore()" ${nTotal<=0?'disabled':''}>Aufhören & Punkte nehmen</button>`;
+      html += `<button class="btn-tutto" onclick="handleTutto()" ${nTotal<300?'disabled':''}>Tutto!</button>`;
+      html += `<button class="btn-niete" onclick="handleNiete()">Niete</button>`;
+    }
+  }
+
+  if (game.phase === 'TUTTO_CHOICE') {
+    html = `<button class="btn-warning" onclick="tuttoChoiceTakePoints()">Aufhören & Punkte nehmen</button>`;
+    html += `<button class="btn-success" onclick="tuttoChoiceContinue()">Neue Karte ziehen</button>`;
+  }
+
+  if (game.phase === 'TURN_END') {
+    html = `<button class="btn-primary" onclick="nextPlayer()">Nächster Spieler</button>`;
+  }
+
+  el.innerHTML = html;
+}
+
+// ─── Setup Screen ────────────────────────────────────────────────────
+let playerCount = 2;
+
+function initSetup() {
+  playerCount = 2;
+  renderPlayerInputs();
+}
+
+function renderPlayerInputs() {
+  const el = document.getElementById('player-inputs');
+  let html = '';
+  for (let i = 0; i < playerCount; i++) {
+    html += `<input type="text" id="pname-${i}" placeholder="Spieler ${i+1}" maxlength="20">`;
+  }
+  el.innerHTML = html;
+}
+
+function addPlayerInput() {
+  if (playerCount >= 10) return;
+  playerCount++;
+  renderPlayerInputs();
+}
+
+function removePlayerInput() {
+  if (playerCount <= 2) return;
+  playerCount--;
+  renderPlayerInputs();
+}
+
+function startGame() {
+  const names = [];
+  for (let i = 0; i < playerCount; i++) {
+    const inp = document.getElementById(`pname-${i}`);
+    const name = inp.value.trim() || `Spieler ${i+1}`;
+    names.push(name);
+  }
+
+  initGame(names);
+  document.getElementById('setup-screen').classList.remove('active');
+  document.getElementById('game-screen').classList.add('active');
+  showMessage('Wähle die gezogene Karte aus!');
+  renderGame();
+}
+
+function resetGame() {
+  document.getElementById('win-overlay').classList.remove('active');
+  document.getElementById('game-screen').classList.remove('active');
+  document.getElementById('setup-screen').classList.add('active');
+  game = null;
+  initSetup();
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// ─── Init ────────────────────────────────────────────────────────────
+initSetup();
+</script>
+</body>
+</html>
