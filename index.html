@@ -358,7 +358,7 @@ let game = null;
 
 function initGame(playerNames) {
   game = {
-    players: playerNames.map(name => ({ name, score: 0 })),
+    players: playerNames.map(name => ({ name, score: 0, history: [] })),
     currentPlayerIndex: 0,
     turn: null,
     // Phases: PICK_CARD, ENTER_POINTS, TURN_END
@@ -374,6 +374,7 @@ function currentPlayer() { return game.players[game.currentPlayerIndex]; }
 
 // ─── Turn Logic ──────────────────────────────────────────────────────
 function startTurn(cardType) {
+  saveState();
   const card = CARD_TYPES[cardType];
   const carried = game.carryPoints || 0;
   game.carryPoints = 0;
@@ -388,6 +389,7 @@ function startTurn(cardType) {
 
   // Stop card: lose all carried points
   if (cardType === 'STOP') {
+    recordScore(game.currentPlayerIndex, carried > 0 ? -carried : 'STOP');
     game.phase = 'TURN_END';
     if (carried > 0) {
       showMessage(`Stop! ${carried} Rundenpunkte verfallen.`, 'niete');
@@ -434,6 +436,27 @@ function getCardInstruction(cardType) {
   }
 }
 
+// ─── Score History ───────────────────────────────────────────────────
+function recordScore(playerIndex, delta) {
+  const h = game.players[playerIndex].history;
+  h.push(delta);
+  if (h.length > 3) h.shift();
+}
+
+// ─── Undo ─────────────────────────────────────────────────────────────
+let gameHistory = [];
+
+function saveState() {
+  gameHistory.push(JSON.stringify(game));
+}
+
+function undoLast() {
+  if (gameHistory.length === 0) return;
+  game = JSON.parse(gameHistory.pop());
+  document.getElementById('win-overlay').classList.remove('active');
+  renderGame();
+}
+
 // ─── Point Entry ─────────────────────────────────────────────────────
 function setPoints(value) {
   const t = game.turn;
@@ -449,17 +472,8 @@ function adjustPoints(amount) {
   renderActions();
 }
 
-function addPoints() {
-  // "Weiter würfeln": add entry to round total, reset entry
-  const t = game.turn;
-  if (t.entryPoints <= 0) return;
-  t.roundPoints += t.entryPoints;
-  showMessage(`+${t.entryPoints} hinzugefügt. Rundenpunkte: ${t.roundPoints}`);
-  t.entryPoints = 0;
-  renderGame();
-}
-
 function stopAndScore() {
+  saveState();
   const t = game.turn;
   // Add any pending entry points
   t.roundPoints += t.entryPoints;
@@ -467,6 +481,7 @@ function stopAndScore() {
 
   const pts = t.roundPoints;
   currentPlayer().score += pts;
+  recordScore(game.currentPlayerIndex, pts);
   game.phase = 'TURN_END';
   showMessage(`+${pts} Punkte! Gesamt: ${currentPlayer().score}`, 'special');
   checkGameEnd();
@@ -474,9 +489,11 @@ function stopAndScore() {
 }
 
 function tuttoChoiceTakePoints() {
+  saveState();
   const t = game.turn;
   const pts = t.roundPoints;
   currentPlayer().score += pts;
+  recordScore(game.currentPlayerIndex, pts);
   game.phase = 'TURN_END';
   showMessage(`+${pts} Punkte! Gesamt: ${currentPlayer().score}`, 'special');
   checkGameEnd();
@@ -484,11 +501,13 @@ function tuttoChoiceTakePoints() {
 }
 
 function tuttoChoiceContinue() {
+  saveState();
   const t = game.turn;
   continueTurnWithNewCard(t.roundPoints);
 }
 
 function handleNiete() {
+  saveState();
   const t = game.turn;
 
   if (t.cardType === 'FEUERWERK') {
@@ -498,6 +517,7 @@ function handleNiete() {
     t.entryPoints = 0;
     const pts = t.roundPoints;
     currentPlayer().score += pts;
+    recordScore(game.currentPlayerIndex, pts);
     game.phase = 'TURN_END';
     showMessage(`Feuerwerk-Niete! Du behältst ${pts} Punkte.`, 'special');
     checkGameEnd();
@@ -506,6 +526,7 @@ function handleNiete() {
   }
 
   if (t.cardType === 'PLUSMINUS' || t.cardType === 'KLEEBLATT' || t.cardType === 'STRASSE') {
+    recordScore(game.currentPlayerIndex, 0);
     game.phase = 'TURN_END';
     showMessage('Niete! 0 Punkte für diese Runde.', 'niete');
     renderGame();
@@ -513,12 +534,14 @@ function handleNiete() {
   }
 
   // Normal niete: lose all round points
+  recordScore(game.currentPlayerIndex, -(t.roundPoints));
   game.phase = 'TURN_END';
   showMessage('Niete! Alle Rundenpunkte verloren.', 'niete');
   renderGame();
 }
 
 function handleTutto() {
+  saveState();
   const t = game.turn;
 
   // For normal cards, first add any pending entry points
@@ -546,11 +569,16 @@ function handleTutto() {
   if (t.cardType === 'PLUSMINUS') {
     t.roundPoints += 1000;
     const leader = getLeader(game.currentPlayerIndex);
-    if (leader !== null) {
-      game.players[leader].score = Math.max(0, game.players[leader].score - 1000);
+    // Only deduct if leader has MORE points than current player
+    if (leader !== null && game.players[leader].score > currentPlayer().score) {
+      const before = game.players[leader].score;
+      game.players[leader].score = Math.max(0, before - 1000);
+      recordScore(leader, game.players[leader].score - before);
+      showMessage(`Tutto! +1000 (Rundenpunkte: ${t.roundPoints}), Führender -1000!`, 'tutto');
+    } else {
+      showMessage(`Tutto! +1000 (Rundenpunkte: ${t.roundPoints})`, 'tutto');
     }
     game.phase = 'TUTTO_CHOICE';
-    showMessage(`Tutto! +1000 (Rundenpunkte: ${t.roundPoints}), Führender -1000!`, 'tutto');
     renderGame();
     return;
   }
@@ -602,10 +630,18 @@ function continueTurnWithNewCard(carryPoints) {
 
 // ─── Navigation ──────────────────────────────────────────────────────
 function nextPlayer() {
+  saveState();
   game.currentPlayerIndex = (game.currentPlayerIndex + 1) % game.players.length;
   if (game.finalRound && game.currentPlayerIndex === game.finalRoundStartPlayer) {
-    endGame();
-    return;
+    // Final round complete – only end if someone still has >= 6000 points
+    const anyAbove6000 = game.players.some(p => p.score >= 6000);
+    if (anyAbove6000) {
+      endGame();
+      return;
+    }
+    // Nobody above 6000 anymore (e.g. Plus/Minus reduced scores) – continue
+    game.finalRound = false;
+    game.finalRoundStartPlayer = -1;
   }
   game.phase = 'PICK_CARD';
   game.turn = null;
@@ -682,7 +718,26 @@ function renderScoreboard() {
   html += '</tr><tr>';
   game.players.forEach((p, i) => {
     const cls = i === game.currentPlayerIndex ? ' class="active-player"' : '';
-    html += `<td${cls}><strong>${p.score}</strong></td>`;
+    const hist = p.history || [];
+    let histHtml = '';
+    for (let j = 0; j < 3; j++) {
+      if (j < hist.length) {
+        const v = hist[j];
+        let color, label;
+        if (v === 'STOP')  { color = '#e67e22'; label = 'Stop'; }
+        else if (v > 0)    { color = '#2ecc71'; label = '+' + v; }
+        else if (v < 0)    { color = '#e74c3c'; label = String(v); }
+        else               { color = '#aaa';    label = 'Niete'; }
+        histHtml += `<span style="color:${color}">${label}</span>`;
+      } else {
+        histHtml += `<span style="color:transparent">–</span>`;
+      }
+      if (j < 2) histHtml += `<span style="color:rgba(255,255,255,.3)"> · </span>`;
+    }
+    html += `<td${cls}>` +
+      `<div style="font-size:.7rem;letter-spacing:.5px;margin-bottom:2px">${histHtml}</div>` +
+      `<strong>${p.score}</strong>` +
+      `</td>`;
   });
   html += '</tr></table>';
   el.innerHTML = html;
@@ -748,7 +803,7 @@ function renderPointsSection() {
       '<button type="button" onclick="setPoints(600)">600</button>' +
       '<button type="button" onclick="setPoints(1000)">1000</button>' +
     '</div>' +
-    '<div class="points-entry-label">Feineinstellung</div>' +
+    '<div class="points-entry-label">Manuell +/- 50 Punkte</div>' +
     '<div class="points-entry">' +
       '<button type="button" class="pe-btn pe-minus" onclick="adjustPoints(-50)">-</button>' +
       `<div class="pe-value">${t.entryPoints}</div>` +
@@ -785,16 +840,14 @@ function renderActions() {
       html += `<button class="btn-niete" onclick="handleNiete()">Niete</button>`;
 
     } else if (cardType === 'FEUERWERK') {
-      // Feuerwerk: can add points, tutto, or niete (no stop allowed)
+      // Feuerwerk: tutto or take points (no stop allowed)
       const fTotal = t.roundPoints + t.entryPoints;
-      html += `<button class="btn-success" onclick="addPoints()" ${t.entryPoints<=0?'disabled':''}>Weiter würfeln</button>`;
       html += `<button class="btn-tutto" onclick="handleTutto()" ${fTotal<300?'disabled':''}>Tutto!</button>`;
-      html += `<button class="btn-niete" onclick="handleNiete()">Niete</button>`;
+      html += `<button class="btn-niete" onclick="handleNiete()">Punkte mitnehmen</button>`;
 
     } else {
-      // Normal / Bonus / x2: can add, stop, tutto, niete
+      // Normal / Bonus / x2: stop, tutto, niete
       const nTotal = t.roundPoints + t.entryPoints;
-      html += `<button class="btn-success" onclick="addPoints()" ${t.entryPoints<=0?'disabled':''}>Weiter würfeln</button>`;
       html += `<button class="btn-warning" onclick="stopAndScore()" ${nTotal<=0?'disabled':''}>Aufhören & Punkte nehmen</button>`;
       html += `<button class="btn-tutto" onclick="handleTutto()" ${nTotal<300?'disabled':''}>Tutto!</button>`;
       html += `<button class="btn-niete" onclick="handleNiete()">Niete</button>`;
@@ -808,6 +861,10 @@ function renderActions() {
 
   if (game.phase === 'TURN_END') {
     html = `<button class="btn-primary" onclick="nextPlayer()">Nächster Spieler</button>`;
+  }
+
+  if (gameHistory.length > 0) {
+    html += `<button class="btn-secondary" onclick="undoLast()" style="margin-top:6px;width:100%;opacity:.8">↩ Zurück</button>`;
   }
 
   el.innerHTML = html;
@@ -850,6 +907,7 @@ function startGame() {
     names.push(name);
   }
 
+  gameHistory = [];
   initGame(names);
   document.getElementById('setup-screen').classList.remove('active');
   document.getElementById('game-screen').classList.add('active');
